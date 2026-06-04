@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyc
+.venv/
+.env
+.ipynb_checkpoints
+
+# Generated outputs (trajectories, checkpoints, eval results)
+runs/
+
+# Data (download separately; see README)
+data/
+
+# External dependencies and legacy code
+history/
+
+# Model weights
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# Logs
+*.log
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Caches
+.huggingface/
+.cache/
+.pytest_cache/
+.mypy_cache/
