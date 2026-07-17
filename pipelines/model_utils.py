@@ -37,7 +37,12 @@ def _get_submodule(root: torch.nn.Module, path: str) -> Optional[torch.nn.Module
     return current
 
 
-def _apply_lora_delta(module: torch.nn.Module, tensor_a: torch.Tensor, tensor_b: torch.Tensor, alpha: float) -> None:
+def _apply_lora_delta(
+    module: torch.nn.Module,
+    tensor_a: torch.Tensor,
+    tensor_b: torch.Tensor,
+    alpha: float,
+) -> None:
     if not isinstance(module, nn.Linear):
         return
     r = tensor_a.shape[0]
@@ -48,7 +53,9 @@ def _apply_lora_delta(module: torch.nn.Module, tensor_a: torch.Tensor, tensor_b:
     module.weight.data += delta.to(module.weight.data.dtype)
 
 
-def _try_apply_safetensors_lora(model: torch.nn.Module, adapter_dir: Path, device: torch.device) -> bool:
+def _try_apply_safetensors_lora(
+    model: torch.nn.Module, adapter_dir: Path, device: torch.device
+) -> bool:
     if st is None:
         return False
 
@@ -78,18 +85,20 @@ def _try_apply_safetensors_lora(model: torch.nn.Module, adapter_dir: Path, devic
         module_path = path_key
         for prefix in ("base_model.model.", "base_model."):
             if module_path.startswith(prefix):
-                module_path = module_path[len(prefix):]
+                module_path = module_path[len(prefix) :]
                 break
         module = _get_submodule(model, module_path)
         if module is None:
             skipped += 1
             continue
-        _apply_lora_delta(module, tensors["A"].to(device), tensors["B"].to(device), alpha)
+        _apply_lora_delta(
+            module, tensors["A"].to(device), tensors["B"].to(device), alpha
+        )
         applied += 1
 
     if applied == 0:
         raise RuntimeError(
-            f"LoRA adapter loaded but 0/{applied+skipped} modules matched the model. "
+            f"LoRA adapter loaded but 0/{applied + skipped} modules matched the model. "
             f"Check key prefixes in {adapter_dir}/adapter_model.safetensors."
         )
     print(f"Applied LoRA to {applied} modules (skipped {skipped}) from {adapter_dir}")
@@ -118,7 +127,9 @@ def load_diffusion_model(
         return model.eval()
 
     if not PEFT_AVAILABLE:
-        raise RuntimeError("LoRA support requires either safetensors weights or the peft package installed.")
+        raise RuntimeError(
+            "LoRA support requires either safetensors weights or the peft package installed."
+        )
 
     peft_model = PeftModel.from_pretrained(model, str(adapter_dir))
     if merge_lora and hasattr(peft_model, "merge_and_unload"):

@@ -1,16 +1,5 @@
-# Core analysis packages
 numpy>=1.24
-jsonlines>=3.1
-pandas>=2.1
-matplotlib>=3.8
-seaborn>=0.13
-
-# Model backends (diffusion + autoregressive)
 torch>=2.2
 transformers>=4.42
 safetensors>=0.4.3
-
-# Optional helpers
-peft>=0.11             # load/merge LoRA adapters
-accelerate>=0.33       # distributed or mixed-precision utilities
-datasets>=2.19         # convenience loaders for HF datasets
+peft>=0.11

@@ -8,6 +8,7 @@ Usage:
 Or compare a sweep:
   python eval_results.py --sweep runs/eval/
 """
+
 from __future__ import annotations
 
 import argparse
@@ -33,7 +34,7 @@ def summarize(rows: List[Dict]) -> Dict:
     latencies = [r["latency"] for r in rows if "latency" in r]
     block_len = rows[0].get("block_len", "?")
     lora = rows[0].get("lora_path", "")
-    model_tag = "baseline" if not lora else f"+3.2"
+    model_tag = "baseline" if not lora else "+3.2"
     return {
         "n": len(rows),
         "correct": correct,
@@ -41,14 +42,19 @@ def summarize(rows: List[Dict]) -> Dict:
         "avg_latency": sum(latencies) / len(latencies) if latencies else None,
         "block_len": block_len,
         "model": model_tag,
-        "tokens_per_sec": rows[0].get("gen_len", 128) / (sum(latencies) / len(latencies)) if latencies else None,
+        "tokens_per_sec": rows[0].get("gen_len", 128)
+        / (sum(latencies) / len(latencies))
+        if latencies
+        else None,
     }
 
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("files", nargs="*", type=Path, help="Result JSONL files")
-    p.add_argument("--sweep", type=Path, default=None, help="Directory to scan for all *.jsonl")
+    p.add_argument(
+        "--sweep", type=Path, default=None, help="Directory to scan for all *.jsonl"
+    )
     return p.parse_args()
 
 
@@ -72,19 +78,25 @@ def main() -> None:
         results.append(s)
 
     # Print table
-    print(f"\n{'File':<45} {'Model':<10} {'Block':>6} {'N':>5} {'Acc':>7} {'Latency':>9} {'tok/s':>8}")
+    print(
+        f"\n{'File':<45} {'Model':<10} {'Block':>6} {'N':>5} {'Acc':>7} {'Latency':>9} {'tok/s':>8}"
+    )
     print("-" * 95)
     for r in results:
         acc = f"{r['accuracy']:.1%}"
-        lat = f"{r['avg_latency']:.2f}s" if r['avg_latency'] else "  —"
-        tps = f"{r['tokens_per_sec']:.1f}" if r['tokens_per_sec'] else "  —"
-        print(f"{r['file']:<45} {r['model']:<10} {str(r['block_len']):>6} "
-              f"{r['n']:>5} {acc:>7} {lat:>9} {tps:>8}")
+        lat = f"{r['avg_latency']:.2f}s" if r["avg_latency"] else "  -"
+        tps = f"{r['tokens_per_sec']:.1f}" if r["tokens_per_sec"] else "  -"
+        print(
+            f"{r['file']:<45} {r['model']:<10} {str(r['block_len']):>6} "
+            f"{r['n']:>5} {acc:>7} {lat:>9} {tps:>8}"
+        )
 
     # Block-size comparison if multiple block_lens present
-    block_lens = sorted(set(r["block_len"] for r in results if isinstance(r["block_len"], int)))
+    block_lens = sorted(
+        set(r["block_len"] for r in results if isinstance(r["block_len"], int))
+    )
     if len(block_lens) > 1:
-        print(f"\n── Block-size quality degradation ──")
+        print("\n── Block-size quality degradation ──")
         models = sorted(set(r["model"] for r in results))
         by = {(r["model"], r["block_len"]): r for r in results}
         ref_block = min(block_lens)

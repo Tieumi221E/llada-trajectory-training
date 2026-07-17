@@ -21,13 +21,14 @@ Usage:
     --out data/constrained_pairs/gsm8k_head100.jsonl \
     --samples-per-trajectory 3
 """
+
 from __future__ import annotations
 
 import argparse
 import json
 import random
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, List, Tuple
 
 from transformers import AutoTokenizer  # type: ignore
 
@@ -36,19 +37,41 @@ LLADA_MASK_ID = 126336
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Extract (x_i, x_0) pairs from diffusion trajectories")
+    p = argparse.ArgumentParser(
+        description="Extract (x_i, x_0) pairs from diffusion trajectories"
+    )
     p.add_argument("--inp", type=Path, required=True, help="Input trajectory JSONL")
     p.add_argument("--out", type=Path, required=True, help="Output pairs JSONL")
-    p.add_argument("--model", type=str, default="GSAI-ML/LLaDA-8B-Instruct",
-                   help="Tokenizer name (needed to convert token strings → IDs)")
-    p.add_argument("--samples-per-trajectory", type=int, default=3,
-                   help="How many (x_i, x_0) pairs to sample per trajectory")
-    p.add_argument("--min-step", type=int, default=1,
-                   help="Skip very early steps (nearly all masked)")
-    p.add_argument("--min-mask-ratio", type=float, default=0.05,
-                   help="Skip steps with fewer than this fraction of masks")
-    p.add_argument("--max-mask-ratio", type=float, default=0.95,
-                   help="Skip steps with more than this fraction of masks")
+    p.add_argument(
+        "--model",
+        type=str,
+        default="GSAI-ML/LLaDA-8B-Instruct",
+        help="Tokenizer name (needed to convert token strings → IDs)",
+    )
+    p.add_argument(
+        "--samples-per-trajectory",
+        type=int,
+        default=3,
+        help="How many (x_i, x_0) pairs to sample per trajectory",
+    )
+    p.add_argument(
+        "--min-step",
+        type=int,
+        default=1,
+        help="Skip very early steps (nearly all masked)",
+    )
+    p.add_argument(
+        "--min-mask-ratio",
+        type=float,
+        default=0.05,
+        help="Skip steps with fewer than this fraction of masks",
+    )
+    p.add_argument(
+        "--max-mask-ratio",
+        type=float,
+        default=0.95,
+        help="Skip steps with more than this fraction of masks",
+    )
     p.add_argument("--seed", type=int, default=42)
     return p.parse_args()
 
@@ -135,14 +158,16 @@ def extract_pairs(
     sample_id_base = row.get("id", f"traj_{id(row)}")
     results = []
     for step_idx, mask_bools, mask_ratio in chosen:
-        results.append({
-            "id": f"{sample_id_base}#step{step_idx}",
-            "prompt_ids": prompt_ids,
-            "answer_ids": answer_ids,
-            "mask_bools": mask_bools,
-            "mask_ratio": mask_ratio,
-            "t_step": step_idx,
-        })
+        results.append(
+            {
+                "id": f"{sample_id_base}#step{step_idx}",
+                "prompt_ids": prompt_ids,
+                "answer_ids": answer_ids,
+                "mask_bools": mask_bools,
+                "mask_ratio": mask_ratio,
+                "t_step": step_idx,
+            }
+        )
     return results
 
 

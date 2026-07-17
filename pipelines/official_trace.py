@@ -52,7 +52,9 @@ class TrajectorySample:
                     "dists": [
                         {
                             "index": md.index,
-                            "topk": [{"token": e.token, "prob": e.prob} for e in md.topk],
+                            "topk": [
+                                {"token": e.token, "prob": e.prob} for e in md.topk
+                            ],
                         }
                         for md in st.dists
                     ],
@@ -67,7 +69,9 @@ class TrajectorySample:
         for sd in d.get("steps", []):
             mds: List[MaskedDist] = []
             for md in sd.get("dists", []):
-                topk = [TopKEntry(e["token"], float(e["prob"])) for e in md.get("topk", [])]
+                topk = [
+                    TopKEntry(e["token"], float(e["prob"])) for e in md.get("topk", [])
+                ]
                 mds.append(MaskedDist(index=int(md["index"]), topk=topk))
             steps.append(
                 TrajectoryStep(
@@ -80,7 +84,11 @@ class TrajectorySample:
                     meta=sd.get("meta"),
                 )
             )
-        return TrajectorySample(prompt=list(d.get("prompt", [])), steps=steps, final=list(d.get("final", [])))
+        return TrajectorySample(
+            prompt=list(d.get("prompt", [])),
+            steps=steps,
+            final=list(d.get("final", [])),
+        )
 
 
 @torch.no_grad()
@@ -105,7 +113,7 @@ def generate_with_trace(
     x = torch.full((1, total_len), int(mask_id), dtype=torch.long, device=device)
     x[:, :Lp] = prompt_ids.clone()
 
-    prompt_index = (x != mask_id)
+    prompt_index = x != mask_id
 
     assert gen_length % block_length == 0 and gen_length > 0
     num_blocks = gen_length // block_length
@@ -134,25 +142,30 @@ def generate_with_trace(
             logits = model(x_).logits
             logits, un_logits = torch.chunk(logits, 2, dim=0)
             logits = un_logits + (cfg_scale + 1) * (logits - un_logits)
-            return logits[:, :inp.shape[1]]
+            return logits[:, : inp.shape[1]]
         return model(inp).logits
 
     total_iters = 0
     for block_idx in range(num_blocks):
         gen_start = Lp + block_idx * block_length
         gen_end = Lp + (block_idx + 1) * block_length
-        block_mask_index = (x[:, gen_start:gen_end] == mask_id)
+        block_mask_index = x[:, gen_start:gen_end] == mask_id
         mask_num = block_mask_index.sum(dim=1, keepdim=True)
 
         base = mask_num // steps_per_block
         remainder = mask_num % steps_per_block
-        num_transfer_tokens = torch.zeros(mask_num.size(0), steps_per_block, device=device, dtype=torch.int64) + base
+        num_transfer_tokens = (
+            torch.zeros(
+                mask_num.size(0), steps_per_block, device=device, dtype=torch.int64
+            )
+            + base
+        )
         for i in range(mask_num.size(0)):
             num_transfer_tokens[i, : remainder[i]] += 1
 
         for s in range(steps_per_block):
             total_iters += 1
-            mask_index = (x == mask_id)
+            mask_index = x == mask_id
             logits = batch_logits(x)
 
             if temperature and temperature > 0:
@@ -168,7 +181,9 @@ def generate_with_trace(
 
             log_probs = F.log_softmax(logits.to(torch.float32), dim=-1)
 
-            x0_p = torch.squeeze(torch.gather(p, dim=-1, index=torch.unsqueeze(x0, -1)), -1)
+            x0_p = torch.squeeze(
+                torch.gather(p, dim=-1, index=torch.unsqueeze(x0, -1)), -1
+            )
 
             masked_dists: List[MaskedDist] = []
             margins: List[float] = []
@@ -178,9 +193,18 @@ def generate_with_trace(
                     li = logits[0, i]
                     topk = torch.topk(li, k=min(topk_save, li.shape[-1]))
                     probs = F.softmax(topk.values, dim=-1).tolist()
-                    toks = [tokenizer.convert_ids_to_tokens(int(idx)) for idx in topk.indices.tolist()]
+                    toks = [
+                        tokenizer.convert_ids_to_tokens(int(idx))
+                        for idx in topk.indices.tolist()
+                    ]
                     masked_dists.append(
-                        MaskedDist(index=i, topk=[TopKEntry(token=t, prob=float(pv)) for t, pv in zip(toks, probs)])
+                        MaskedDist(
+                            index=i,
+                            topk=[
+                                TopKEntry(token=t, prob=float(pv))
+                                for t, pv in zip(toks, probs)
+                            ],
+                        )
                     )
                     if len(probs) >= 2:
                         margins.append(float(probs[0] - probs[1]))
@@ -198,7 +222,9 @@ def generate_with_trace(
             transfer_index = torch.zeros_like(x0, dtype=torch.bool, device=device)
             for j in range(conf.shape[0]):
                 conf_j = conf[j]
-                conf_j = torch.where(mask_index[j], conf_j, torch.tensor(-float("inf"), device=device))
+                conf_j = torch.where(
+                    mask_index[j], conf_j, torch.tensor(-float("inf"), device=device)
+                )
                 k = int(num_transfer_tokens[j, s].item())
                 if k > 0:
                     _, select_index = torch.topk(conf_j, k=k)
@@ -211,7 +237,9 @@ def generate_with_trace(
             x[transfer_index] = x0_eff[transfer_index]
 
             tok_ids = tokens_before
-            tok_strs = [tokenizer.convert_ids_to_tokens(int(t)) for t in tok_ids[0].tolist()]
+            tok_strs = [
+                tokenizer.convert_ids_to_tokens(int(t)) for t in tok_ids[0].tolist()
+            ]
             mask_list = [bool(m) for m in mask_before[0].tolist()]
             commit_vec = [bool(transfer_index[0, i].item()) for i in range(x.shape[1])]
 
@@ -219,7 +247,11 @@ def generate_with_trace(
             pm_list = [float(x0_p[0, i].item()) for i in masked_positions]
             pmax_mean = float(sum(pm_list) / max(1, len(pm_list)))
             margin_mean = float(sum(margins) / max(1, len(margins))) if margins else 0.0
-            ent_topk_mean = float(sum(ent_topk_list) / max(1, len(ent_topk_list))) if ent_topk_list else 0.0
+            ent_topk_mean = (
+                float(sum(ent_topk_list) / max(1, len(ent_topk_list)))
+                if ent_topk_list
+                else 0.0
+            )
             commit_count = int(sum(1 for b in commit_vec if b))
 
             if commit_count > 0:
@@ -263,12 +295,18 @@ def generate_with_trace(
 
     # Content-only logprob: only positions before the first EOS token
     EOS_ID = 126081
-    first_eos_pos = next((i for i, t in enumerate(final_ids) if int(t) == EOS_ID), len(final_ids))
-    content_lp_sum = sum(lp for pos, lp in position_logprob.items() if pos < first_eos_pos)
+    first_eos_pos = next(
+        (i for i, t in enumerate(final_ids) if int(t) == EOS_ID), len(final_ids)
+    )
+    content_lp_sum = sum(
+        lp for pos, lp in position_logprob.items() if pos < first_eos_pos
+    )
     content_count = sum(1 for pos in position_logprob if pos < first_eos_pos)
 
     sample = TrajectorySample(
-        prompt=[tokenizer.convert_ids_to_tokens(int(t)) for t in prompt_ids[0].tolist()],
+        prompt=[
+            tokenizer.convert_ids_to_tokens(int(t)) for t in prompt_ids[0].tolist()
+        ],
         steps=steps_out,
         final=final_tok_strs,
     )
@@ -288,8 +326,12 @@ def generate_with_trace(
     pmax_slope = 0.0
     if per_step_pmax_mean:
         pmax_slope = float(per_step_pmax_mean[-1] - per_step_pmax_mean[0])
-    margin_step_mean = float(sum(per_step_margin_mean) / max(1, len(per_step_margin_mean)))
-    ent_step_mean = float(sum(per_step_entropy_topk_mean) / max(1, len(per_step_entropy_topk_mean)))
+    margin_step_mean = float(
+        sum(per_step_margin_mean) / max(1, len(per_step_margin_mean))
+    )
+    ent_step_mean = float(
+        sum(per_step_entropy_topk_mean) / max(1, len(per_step_entropy_topk_mean))
+    )
 
     summary = {
         "nfe": float(len(steps_out)),

@@ -16,31 +16,83 @@ from pipelines.model_utils import load_diffusion_model
 
 
 def build_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Generate teacher trajectories using official LLaDA sampler (with trace)")
-    p.add_argument("--jsonl", type=str, required=True, help="Input JSONL with fields: prompt, answer")
-    p.add_argument("--out", type=str, required=True, help="Output JSONL of trajectories")
+    p = argparse.ArgumentParser(
+        description="Generate teacher trajectories using official LLaDA sampler (with trace)"
+    )
+    p.add_argument(
+        "--jsonl",
+        type=str,
+        required=True,
+        help="Input JSONL with fields: prompt, answer",
+    )
+    p.add_argument(
+        "--out", type=str, required=True, help="Output JSONL of trajectories"
+    )
     p.add_argument("--model", type=str, default="GSAI-ML/LLaDA-8B-Instruct")
     p.add_argument("--steps", type=int, default=128)
     p.add_argument("--gen-len", type=int, default=128)
     p.add_argument("--block-len", type=int, default=32)
     p.add_argument("--temperature", type=float, default=0.0)
     p.add_argument("--cfg-scale", type=float, default=0.0)
-    p.add_argument("--remasking", type=str, default="low_confidence", choices=["low_confidence", "random"])
+    p.add_argument(
+        "--remasking",
+        type=str,
+        default="low_confidence",
+        choices=["low_confidence", "random"],
+    )
     p.add_argument("--mask-id", type=int, default=126336)
     p.add_argument("--use-chat-template", action="store_true")
     p.add_argument("--limit", type=int, default=0)
     p.add_argument("--device", type=str, default="cuda")
-    p.add_argument("--keep-only-correct", action="store_true", help="Only write samples judged correct")
-    p.add_argument("--min-pmax", type=float, default=0.0, help="Min average pmax across steps")
-    p.add_argument("--min-auc", type=float, default=0.0, help="Min normalized AUC of commit progress [0,1]")
-    p.add_argument("--max-idle", type=float, default=1.0, help="Max ratio of steps with zero commits")
-    p.add_argument("--min-margin", type=float, default=0.0, help="Min mean top-1 minus top-2 prob margin")
-    p.add_argument("--min-pmax-slope", type=float, default=-1.0, help="Min increase in pmax from first to last step")
+    p.add_argument(
+        "--keep-only-correct",
+        action="store_true",
+        help="Only write samples judged correct",
+    )
+    p.add_argument(
+        "--min-pmax", type=float, default=0.0, help="Min average pmax across steps"
+    )
+    p.add_argument(
+        "--min-auc",
+        type=float,
+        default=0.0,
+        help="Min normalized AUC of commit progress [0,1]",
+    )
+    p.add_argument(
+        "--max-idle",
+        type=float,
+        default=1.0,
+        help="Max ratio of steps with zero commits",
+    )
+    p.add_argument(
+        "--min-margin",
+        type=float,
+        default=0.0,
+        help="Min mean top-1 minus top-2 prob margin",
+    )
+    p.add_argument(
+        "--min-pmax-slope",
+        type=float,
+        default=-1.0,
+        help="Min increase in pmax from first to last step",
+    )
     p.add_argument("--topk-save", type=int, default=8)
-    p.add_argument("--num-samples", type=int, default=1, help="Number of trajectories to sample per problem (for diverse ordering)")
-    p.add_argument("--lora-path", type=str, default="", help="Optional LoRA adapter path")
-    p.add_argument("--answer-format", type=str, default="gsm8k", choices=["gsm8k", "math"],
-                   help="Answer format: gsm8k (#### number) or math (\\boxed{})")
+    p.add_argument(
+        "--num-samples",
+        type=int,
+        default=1,
+        help="Number of trajectories to sample per problem (for diverse ordering)",
+    )
+    p.add_argument(
+        "--lora-path", type=str, default="", help="Optional LoRA adapter path"
+    )
+    p.add_argument(
+        "--answer-format",
+        type=str,
+        default="gsm8k",
+        choices=["gsm8k", "math"],
+        help="Answer format: gsm8k (#### number) or math (\\boxed{})",
+    )
     return p.parse_args()
 
 
@@ -103,6 +155,7 @@ def check_math_correct(pred_text: str, gold_solution: str) -> bool:
     """Use math_verify to compare predicted answer with gold solution."""
     try:
         from math_verify import verify, parse  # type: ignore
+
         pred_boxed = extract_boxed(pred_text)
         gold_boxed = extract_boxed(gold_solution)
         if pred_boxed is None or gold_boxed is None:
@@ -144,7 +197,9 @@ def main():
 
             if args.use_chat_template:
                 messages = [{"role": "user", "content": prompt_raw}]
-                prompt_text = tokenizer.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+                prompt_text = tokenizer.apply_chat_template(
+                    messages, add_generation_prompt=True, tokenize=False
+                )
             else:
                 prompt_text = prompt_raw
 
@@ -177,8 +232,12 @@ def main():
 
                 # Decode readable final text (suffix only)
                 final_ids_raw = [tokenizer.convert_tokens_to_ids(t) for t in traj.final]
-                final_ids = [int(i) for i in final_ids_raw if isinstance(i, int) and i >= 0]
-                suffix_text = decode_suffix_text(tokenizer, final_ids, prompt_len=len(prompt_ids))
+                final_ids = [
+                    int(i) for i in final_ids_raw if isinstance(i, int) and i >= 0
+                ]
+                suffix_text = decode_suffix_text(
+                    tokenizer, final_ids, prompt_len=len(prompt_ids)
+                )
 
                 # Correctness check
                 if args.answer_format == "math":
@@ -205,14 +264,25 @@ def main():
                                 margin_vals.append(float(st.meta["margin_mean"]))
                             except Exception:
                                 pass
-                avg_pmax = float(sum(pmax_vals) / max(1, len(pmax_vals))) if pmax_vals else 0.0
-                avg_margin = float(sum(margin_vals) / max(1, len(margin_vals))) if margin_vals else 0.0
+                avg_pmax = (
+                    float(sum(pmax_vals) / max(1, len(pmax_vals))) if pmax_vals else 0.0
+                )
+                avg_margin = (
+                    float(sum(margin_vals) / max(1, len(margin_vals)))
+                    if margin_vals
+                    else 0.0
+                )
 
                 # Build record
                 d = traj.to_dict()
                 d["prompt_text"] = prompt_text
                 d["final_text_suffix"] = suffix_text
-                d["summary"] = {**summ, "correct": bool(correct), "avg_pmax": avg_pmax, "avg_margin": avg_margin}
+                d["summary"] = {
+                    **summ,
+                    "correct": bool(correct),
+                    "avg_pmax": avg_pmax,
+                    "avg_margin": avg_margin,
+                }
                 d["latency"] = round(latency, 3)
                 d["gen_len"] = args.gen_len
                 d["block_len"] = args.block_len

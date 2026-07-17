@@ -5,7 +5,7 @@ but mask pattern is random (standard LLaDA diffusion masking) instead of
 trajectory-derived. Used to ablate whether Section 3.2's improvement comes from
 the constrained order signal or simply from fine-tuning on GSM8K.
 
-Masking follows diffusion_core/masking.py:
+Masking follows the standard forward process:
   t ~ Uniform(0, 1)
   p = (1 - eps) * t + eps
   each answer token independently masked with prob p
@@ -13,6 +13,7 @@ Masking follows diffusion_core/masking.py:
 Output format is identical to prepare_constrained_pairs.py so it feeds directly
 into constrained_train.py.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -29,12 +30,24 @@ EPS = 1e-3
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Prepare SFT control pairs with random masking")
-    p.add_argument("--inp", type=Path, required=True, help="Input trajectory JSONL (filtered_elbo.jsonl)")
+    p = argparse.ArgumentParser(
+        description="Prepare SFT control pairs with random masking"
+    )
+    p.add_argument(
+        "--inp",
+        type=Path,
+        required=True,
+        help="Input trajectory JSONL (filtered_elbo.jsonl)",
+    )
     p.add_argument("--out", type=Path, required=True, help="Output pairs JSONL")
     p.add_argument("--model", type=str, default="GSAI-ML/LLaDA-8B-Instruct")
     p.add_argument("--samples-per-trajectory", type=int, default=10)
-    p.add_argument("--limit", type=int, default=0, help="Randomly sample this many trajectories (0 = all)")
+    p.add_argument(
+        "--limit",
+        type=int,
+        default=0,
+        help="Randomly sample this many trajectories (0 = all)",
+    )
     p.add_argument("--min-mask-ratio", type=float, default=0.05)
     p.add_argument("--max-mask-ratio", type=float, default=0.95)
     p.add_argument("--seed", type=int, default=42)
@@ -53,8 +66,9 @@ def token_strings_to_ids(tokenizer, token_strings: List[str]) -> List[int]:
     return ids
 
 
-def random_mask(answer_len: int, rng: random.Random,
-                min_ratio: float, max_ratio: float) -> tuple[list[bool], float]:
+def random_mask(
+    answer_len: int, rng: random.Random, min_ratio: float, max_ratio: float
+) -> tuple[list[bool], float]:
     """Sample t ~ Uniform, compute p=(1-eps)*t+eps, mask each token independently."""
     for _ in range(100):
         t = rng.random()
@@ -72,9 +86,14 @@ def random_mask(answer_len: int, rng: random.Random,
     return mask_bools, sum(mask_bools) / answer_len
 
 
-def extract_pairs(row: Dict, tokenizer, samples_per_traj: int,
-                  min_mask_ratio: float, max_mask_ratio: float,
-                  rng: random.Random) -> List[Dict]:
+def extract_pairs(
+    row: Dict,
+    tokenizer,
+    samples_per_traj: int,
+    min_mask_ratio: float,
+    max_mask_ratio: float,
+    rng: random.Random,
+) -> List[Dict]:
     prompt_strs: List[str] = row.get("prompt", [])
     final_strs: List[str] = row.get("final", [])
 
@@ -95,14 +114,16 @@ def extract_pairs(row: Dict, tokenizer, samples_per_traj: int,
         mask_bools, mask_ratio = random_mask(
             len(answer_ids), rng, min_mask_ratio, max_mask_ratio
         )
-        results.append({
-            "id": f"{sample_id_base}#rnd{i}",
-            "prompt_ids": prompt_ids,
-            "answer_ids": answer_ids,
-            "mask_bools": mask_bools,
-            "mask_ratio": mask_ratio,
-            "t_step": i,
-        })
+        results.append(
+            {
+                "id": f"{sample_id_base}#rnd{i}",
+                "prompt_ids": prompt_ids,
+                "answer_ids": answer_ids,
+                "mask_bools": mask_bools,
+                "mask_ratio": mask_ratio,
+                "t_step": i,
+            }
+        )
     return results
 
 
@@ -130,7 +151,8 @@ def main() -> None:
     with args.out.open("w", encoding="utf-8") as fout:
         for row in rows:
             pairs = extract_pairs(
-                row, tokenizer,
+                row,
+                tokenizer,
                 samples_per_traj=args.samples_per_trajectory,
                 min_mask_ratio=args.min_mask_ratio,
                 max_mask_ratio=args.max_mask_ratio,

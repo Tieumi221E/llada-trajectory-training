@@ -52,11 +52,11 @@ Section 3.2 addresses this by fine-tuning the model on its own naturally-ordered
 
 | Condition | block32 | block64 | block128 | block256 | drop (32→256) |
 |---|---|---|---|---|---|
-| baseline | 73.6% | 75.0% | 73.0% | 57.2% | −16.4% |
-| **proper_constrained** | **75.2%** | **74.2%** | **72.0%** | **61.8%** | **−13.4%** |
-| random_constrained | 73.8% | 72.4% | 70.8% | 61.0% | −12.8% |
-| sft_control | 71.0% | 72.8% | 69.0% | 57.4% | −13.6% |
-| sft_random | 73.0% | 71.6% | 68.2% | 56.6% | −16.4% |
+| baseline | 73.6% | 75.0% | 73.0% | 57.2% | -16.4% |
+| **proper_constrained** | **75.2%** | **74.2%** | **72.0%** | **61.8%** | **-13.4%** |
+| random_constrained | 73.8% | 72.4% | 70.8% | 61.0% | -12.8% |
+| sft_control | 71.0% | 72.8% | 69.0% | 57.4% | -13.6% |
+| sft_random | 73.0% | 71.6% | 68.2% | 56.6% | -16.4% |
 
 ---
 
@@ -65,8 +65,8 @@ Section 3.2 addresses this by fine-tuning the model on its own naturally-ordered
 ### Trajectory mask is the primary driver
 
 The trajectory mask contributes a consistent **+4.4%** at block256, regardless of which trajectory was selected:
-- `proper_constrained`(61.8%) − `sft_control`(57.4%) = +4.4%
-- `random_constrained`(61.0%) − `sft_random`(56.6%) = +4.4%
+- `proper_constrained`(61.8%) - `sft_control`(57.4%) = +4.4%
+- `random_constrained`(61.0%) - `sft_random`(56.6%) = +4.4%
 
 ### Two fundamentally different mechanisms of slope reduction
 
@@ -83,17 +83,17 @@ This is confirmed by training loss: constrained conditions maintain high loss th
 
 ### ELBO selection has a smaller but real effect
 
-`proper_constrained` outperforms `random_constrained` consistently across **all** block sizes by 0.8–1.8%, with a uniform direction. This is not noise—it is a systematic lift of the entire accuracy curve.
+`proper_constrained` outperforms `random_constrained` consistently across **all** block sizes by 0.8-1.8%, with a uniform direction. This is not noise-it is a systematic lift of the entire accuracy curve.
 
 | | block32 | block64 | block128 | block256 |
 |---|---|---|---|---|
-| proper − random | +1.4% | +1.8% | +1.2% | +0.8% |
+| proper - random | +1.4% | +1.8% | +1.2% | +0.8% |
 
 The effect is an order of magnitude smaller than the trajectory mask contribution, but the per-problem ELBO selection does add value.
 
 ### Unexpected finding: any correct trajectory suffices
 
-The paper motivates ELBO selection as necessary for identifying the "most natural" generation order. Our results show that even a randomly-chosen correct trajectory achieves nearly the same robustness benefit. On GSM8K, the ordering differences between correct trajectories appear to carry similar training signal—the critical ingredient is using *a* trajectory mask, not finding the *best* one.
+The paper motivates ELBO selection as necessary for identifying the "most natural" generation order. Our results show that even a randomly-chosen correct trajectory achieves nearly the same robustness benefit. On GSM8K, the ordering differences between correct trajectories appear to carry similar training signal-the critical ingredient is using *a* trajectory mask, not finding the *best* one.
 
 ### Limitations
 
@@ -117,12 +117,7 @@ pipelines/
   model_utils.py                # LLaDA model loading (AutoModel, not CausalLM)
   official_trace.py             # LLaDA sampler with trajectory recording
 
-diffusion_core/
-  masking.py                    # Forward noise process
-  loss.py                       # Diffusion cross-entropy loss
-  data.py                       # DataLoader collator
-
-run_gsm8k.sh                    # End-to-end experiment script (Steps 0–6)
+run_gsm8k.sh                    # End-to-end experiment script (Steps 0-6)
 eval_results.py                 # Utility: summarize eval JSONL files
 ```
 
@@ -148,7 +143,7 @@ mkdir -p data/prepared
 
 ## Usage
 
-**Full experiment (Steps 0–6, requires 4 GPUs):**
+**Full experiment (Steps 0-6, requires 4 GPUs):**
 ```bash
 nohup bash run_gsm8k.sh > run_gsm8k.log 2>&1 &
 ```
@@ -207,7 +202,11 @@ python eval_results.py runs/eval_block256.jsonl
 ## Requirements
 
 ```bash
-pip install torch transformers peft accelerate
+python -m pip install -r requirements.txt
 ```
 
 Model: `GSAI-ML/LLaDA-8B-Instruct` (HuggingFace Hub)
+
+## License
+
+MIT. See [LICENSE](LICENSE).

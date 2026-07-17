@@ -19,6 +19,7 @@ Usage:
     --out runs/gsm8k_proper/trajectories/random_order.jsonl \
     --random-select
 """
+
 from __future__ import annotations
 
 import argparse
@@ -32,11 +33,18 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("--inp", type=Path, required=True)
     p.add_argument("--out", type=Path, required=True)
-    p.add_argument("--random-select", action="store_true",
-                   help="Randomly pick one trajectory per problem instead of best ELBO")
-    p.add_argument("--group-by", type=str, default="prompt_text",
-                   choices=["problem_id", "prompt_text"],
-                   help="Field to group trajectories by (prompt_text is safer for multi-file runs)")
+    p.add_argument(
+        "--random-select",
+        action="store_true",
+        help="Randomly pick one trajectory per problem instead of best ELBO",
+    )
+    p.add_argument(
+        "--group-by",
+        type=str,
+        default="prompt_text",
+        choices=["problem_id", "prompt_text"],
+        help="Field to group trajectories by (prompt_text is safer for multi-file runs)",
+    )
     p.add_argument("--seed", type=int, default=42)
     return p.parse_args()
 
@@ -70,12 +78,16 @@ def main() -> None:
                 continue
             record = json.loads(line)
             if args.group_by == "prompt_text":
-                key = record.get("prompt_text", record.get("problem_id", record.get("id", "")))
+                key = record.get(
+                    "prompt_text", record.get("problem_id", record.get("id", ""))
+                )
             else:
                 key = str(record.get("problem_id", record.get("id", "")))
             groups[key].append(record)
 
-    print(f"Loaded {sum(len(v) for v in groups.values())} trajectories across {len(groups)} problems")
+    print(
+        f"Loaded {sum(len(v) for v in groups.values())} trajectories across {len(groups)} problems"
+    )
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     written = 0
@@ -102,8 +114,10 @@ def main() -> None:
             variances = [max(s) - min(s) for s in scores_per_problem]
             avg_var = sum(variances) / len(variances)
             max_var = max(variances)
-            print(f"ELBO spread (max-min per problem): avg={avg_var:.4f}, max={max_var:.4f}")
-            print(f"  (larger spread = ELBO selection more meaningful)")
+            print(
+                f"ELBO spread (max-min per problem): avg={avg_var:.4f}, max={max_var:.4f}"
+            )
+            print("  (larger spread = ELBO selection more meaningful)")
 
 
 if __name__ == "__main__":

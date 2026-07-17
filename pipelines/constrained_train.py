@@ -23,6 +23,7 @@ Usage:
     --lora-rank 32 --lora-target-modules q_proj,k_proj,v_proj,o_proj \
     --epochs 5 --lr 2e-5 --batch-size 4 --grad-accum 8
 """
+
 from __future__ import annotations
 
 import argparse
@@ -30,7 +31,7 @@ import json
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import torch
 import torch.nn.functional as F
@@ -38,7 +39,7 @@ from torch.utils.data import DataLoader, Dataset
 from transformers import AutoModel, AutoTokenizer, get_linear_schedule_with_warmup  # type: ignore
 
 LLADA_MASK_ID = 126336
-LLADA_EOS_ID = 126081  # <|endoftext|> — first occurrence is the real terminator
+LLADA_EOS_ID = 126081  # <|endoftext|> - first occurrence is the real terminator
 # Random substitution token range: avoid special tokens at vocab boundaries
 EDIT_TOKEN_MIN = 100
 EDIT_TOKEN_MAX = 126000
@@ -47,6 +48,7 @@ EDIT_TOKEN_MAX = 126000
 # ---------------------------------------------------------------------------
 # Data
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class TrainingPair:
@@ -65,12 +67,14 @@ class ConstrainedPairDataset(Dataset):
                 if not line:
                     continue
                 d = json.loads(line)
-                self.samples.append(TrainingPair(
-                    prompt_ids=list(d["prompt_ids"]),
-                    answer_ids=list(d["answer_ids"]),
-                    mask_bools=[bool(b) for b in d["mask_bools"]],
-                    mask_ratio=float(d.get("mask_ratio", 0.5)),
-                ))
+                self.samples.append(
+                    TrainingPair(
+                        prompt_ids=list(d["prompt_ids"]),
+                        answer_ids=list(d["answer_ids"]),
+                        mask_bools=[bool(b) for b in d["mask_bools"]],
+                        mask_ratio=float(d.get("mask_ratio", 0.5)),
+                    )
+                )
         if not self.samples:
             raise RuntimeError(f"No samples in {path}")
 
@@ -158,6 +162,7 @@ def collate_fn(
 # Loss
 # ---------------------------------------------------------------------------
 
+
 def masked_diffusion_loss(
     logits: torch.Tensor,
     labels: torch.Tensor,
@@ -177,7 +182,9 @@ def masked_diffusion_loss(
     safe_labels = labels.clone()
     safe_labels[~valid] = 0
 
-    token_nll = -torch.gather(log_probs, -1, safe_labels.unsqueeze(-1)).squeeze(-1)  # (B, L)
+    token_nll = -torch.gather(log_probs, -1, safe_labels.unsqueeze(-1)).squeeze(
+        -1
+    )  # (B, L)
     token_nll = token_nll * valid.float()
 
     per_sample_count = valid.sum(dim=1).float().clamp(min=1)
@@ -193,21 +200,28 @@ def masked_diffusion_loss(
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Constrained-order fine-tuning for LLaDA (Section 3.2)")
+    p = argparse.ArgumentParser(
+        description="Constrained-order fine-tuning for LLaDA (Section 3.2)"
+    )
     p.add_argument("--train-jsonl", type=Path, required=True)
     p.add_argument("--eval-jsonl", type=Path, default=None)
     p.add_argument("--output-dir", type=Path, required=True)
     p.add_argument("--model", type=str, default="GSAI-ML/LLaDA-8B-Instruct")
 
     # LoRA (optional)
-    p.add_argument("--lora-rank", type=int, default=0,
-                   help="LoRA rank (0 = full fine-tuning)")
+    p.add_argument(
+        "--lora-rank", type=int, default=0, help="LoRA rank (0 = full fine-tuning)"
+    )
     p.add_argument("--lora-alpha", type=int, default=64)
     p.add_argument("--lora-dropout", type=float, default=0.05)
-    p.add_argument("--lora-target-modules", type=str,
-                   default="q_proj,k_proj,v_proj,o_proj",
-                   help="Comma-separated LoRA target module names")
+    p.add_argument(
+        "--lora-target-modules",
+        type=str,
+        default="q_proj,k_proj,v_proj,o_proj",
+        help="Comma-separated LoRA target module names",
+    )
 
     # Training
     p.add_argument("--batch-size", type=int, default=4)
@@ -215,17 +229,27 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--lr", type=float, default=2e-5)
     p.add_argument("--weight-decay", type=float, default=0.01)
     p.add_argument("--epochs", type=int, default=5)
-    p.add_argument("--warmup-frac", type=float, default=0.1,
-                   help="Warmup as fraction of total optimizer steps")
+    p.add_argument(
+        "--warmup-frac",
+        type=float,
+        default=0.1,
+        help="Warmup as fraction of total optimizer steps",
+    )
     p.add_argument("--max-length", type=int, default=640)
     p.add_argument("--save-steps", type=int, default=500)
     p.add_argument("--eval-steps", type=int, default=1000)
-    p.add_argument("--mixed-precision", choices=["bf16", "fp16", "none"], default="bf16")
+    p.add_argument(
+        "--mixed-precision", choices=["bf16", "fp16", "none"], default="bf16"
+    )
     p.add_argument("--gradient-checkpointing", action="store_true")
 
     # Edit augmentation f(x_i)
-    p.add_argument("--edit-frac", type=float, default=0.15,
-                   help="Fraction of committed answer tokens to randomly substitute (f augmentation)")
+    p.add_argument(
+        "--edit-frac",
+        type=float,
+        default=0.15,
+        help="Fraction of committed answer tokens to randomly substitute (f augmentation)",
+    )
 
     p.add_argument("--seed", type=int, default=42)
     return p.parse_args()
@@ -234,9 +258,13 @@ def parse_args() -> argparse.Namespace:
 def load_model_and_tokenizer(args):
     tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
 
-    dtype = (torch.bfloat16 if args.mixed_precision == "bf16"
-             else torch.float16 if args.mixed_precision == "fp16"
-             else torch.float32)
+    dtype = (
+        torch.bfloat16
+        if args.mixed_precision == "bf16"
+        else torch.float16
+        if args.mixed_precision == "fp16"
+        else torch.float32
+    )
 
     model = AutoModel.from_pretrained(
         args.model,
@@ -249,7 +277,7 @@ def load_model_and_tokenizer(args):
 
     if args.lora_rank > 0:
         try:
-            from peft import LoraConfig, get_peft_model, TaskType  # type: ignore
+            from peft import LoraConfig, get_peft_model  # type: ignore
         except ImportError:
             raise RuntimeError("LoRA requires `pip install peft`")
         target_modules = [m.strip() for m in args.lora_target_modules.split(",")]
@@ -274,7 +302,9 @@ def evaluate(model, loader, device, autocast_dtype) -> float:
         batch = {k: v.to(device) for k, v in batch.items()}
         w = batch.pop("weights")
         lb = batch.pop("labels")
-        with torch.autocast(device_type="cuda", dtype=autocast_dtype, enabled=autocast_dtype is not None):
+        with torch.autocast(
+            device_type="cuda", dtype=autocast_dtype, enabled=autocast_dtype is not None
+        ):
             logits = model(**batch).logits
             loss = masked_diffusion_loss(logits, lb, w)
         losses.append(loss.item())
@@ -288,35 +318,67 @@ def main() -> None:
     torch.cuda.manual_seed_all(args.seed)
 
     model, tokenizer = load_model_and_tokenizer(args)
-    pad_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
+    pad_id = (
+        tokenizer.pad_token_id
+        if tokenizer.pad_token_id is not None
+        else tokenizer.eos_token_id
+    )
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
 
     train_ds = ConstrainedPairDataset(args.train_jsonl)
     eval_ds = ConstrainedPairDataset(args.eval_jsonl) if args.eval_jsonl else None
-    print(f"Train: {len(train_ds)} pairs" + (f"  Eval: {len(eval_ds)} pairs" if eval_ds else ""))
+    print(
+        f"Train: {len(train_ds)} pairs"
+        + (f"  Eval: {len(eval_ds)} pairs" if eval_ds else "")
+    )
 
-    _collate = lambda batch: collate_fn(batch, pad_id, args.max_length, args.edit_frac)
-    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,
-                              collate_fn=_collate, pin_memory=True)
-    eval_loader = DataLoader(eval_ds, batch_size=args.batch_size, shuffle=False,
-                             collate_fn=_collate, pin_memory=True) if eval_ds else None
+    def _collate(batch):
+        return collate_fn(batch, pad_id, args.max_length, args.edit_frac)
+
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=args.batch_size,
+        shuffle=True,
+        collate_fn=_collate,
+        pin_memory=True,
+    )
+    eval_loader = (
+        DataLoader(
+            eval_ds,
+            batch_size=args.batch_size,
+            shuffle=False,
+            collate_fn=_collate,
+            pin_memory=True,
+        )
+        if eval_ds
+        else None
+    )
 
     optimizer = torch.optim.AdamW(
         [p for p in model.parameters() if p.requires_grad],
-        lr=args.lr, weight_decay=args.weight_decay,
+        lr=args.lr,
+        weight_decay=args.weight_decay,
     )
     total_steps = (len(train_loader) * args.epochs) // max(args.grad_accum, 1)
     warmup_steps = max(10, int(total_steps * args.warmup_frac))
-    print(f"Optimizer steps: total={total_steps}, warmup={warmup_steps} "
-          f"(batches/epoch={len(train_loader)}, epochs={args.epochs}, grad_accum={args.grad_accum})")
+    print(
+        f"Optimizer steps: total={total_steps}, warmup={warmup_steps} "
+        f"(batches/epoch={len(train_loader)}, epochs={args.epochs}, grad_accum={args.grad_accum})"
+    )
     scheduler = get_linear_schedule_with_warmup(
-        optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps,
+        optimizer,
+        num_warmup_steps=warmup_steps,
+        num_training_steps=total_steps,
     )
     scaler = torch.amp.GradScaler("cuda", enabled=args.mixed_precision == "fp16")
-    autocast_dtype = (torch.bfloat16 if args.mixed_precision == "bf16"
-                      else torch.float16 if args.mixed_precision == "fp16"
-                      else None)
+    autocast_dtype = (
+        torch.bfloat16
+        if args.mixed_precision == "bf16"
+        else torch.float16
+        if args.mixed_precision == "fp16"
+        else None
+    )
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     global_step = 0
@@ -328,7 +390,11 @@ def main() -> None:
             weights = batch.pop("weights")
             labels = batch.pop("labels")
 
-            with torch.autocast(device_type="cuda", dtype=autocast_dtype, enabled=autocast_dtype is not None):
+            with torch.autocast(
+                device_type="cuda",
+                dtype=autocast_dtype,
+                enabled=autocast_dtype is not None,
+            ):
                 logits = model(**batch).logits
                 loss = masked_diffusion_loss(logits, labels, weights) / args.grad_accum
 
@@ -350,7 +416,9 @@ def main() -> None:
                 optimizer.zero_grad(set_to_none=True)
 
             if global_step % 50 == 0:
-                print(f"[ep{epoch+1} step{global_step}] loss={loss.item() * args.grad_accum:.4f}")
+                print(
+                    f"[ep{epoch + 1} step{global_step}] loss={loss.item() * args.grad_accum:.4f}"
+                )
 
             global_step += 1
 
