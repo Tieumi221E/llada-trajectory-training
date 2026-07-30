@@ -115,7 +115,7 @@ pipelines/
   prepare_sft_control_pairs.py  # Same data, random mask (SFT ablation)
   constrained_train.py          # LoRA fine-tuning
   model_utils.py                # LLaDA model loading (AutoModel, not CausalLM)
-  official_trace.py             # LLaDA sampler with trajectory recording
+  official_trace.py             # Adapter to the shared dllm trajectory sampler
 
 run_gsm8k.sh                    # End-to-end experiment script (Steps 0-6)
 eval_results.py                 # Utility: summarize eval JSONL files
@@ -202,8 +202,16 @@ python eval_results.py runs/eval_block256.jsonl
 ## Requirements
 
 ```bash
+git clone https://github.com/Tieumi221E/dllm.git
+git -C dllm checkout e22684e48a6a4e2637f5112bbaff508b125c7643
+python -m pip install -e ./dllm
 python -m pip install -r requirements.txt
 ```
+
+Trajectory generation, trace serialization, and the constrained masked loss
+use the shared [`dllm`](https://github.com/Tieumi221E/dllm) package. New
+trajectory files store token IDs under the `dllm.trajectory.v1` schema; the
+pair-preparation scripts continue to accept the earlier token-string format.
 
 Model: `GSAI-ML/LLaDA-8B-Instruct` (HuggingFace Hub)
 

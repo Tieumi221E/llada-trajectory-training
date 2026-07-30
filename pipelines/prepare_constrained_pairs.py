@@ -88,11 +88,13 @@ def load_trajectories(path: Path) -> List[Dict]:
     return rows
 
 
-def token_strings_to_ids(tokenizer, token_strings: List[str]) -> List[int]:
-    """Convert token strings (from tokenizer.convert_ids_to_tokens) back to IDs."""
+def token_strings_to_ids(tokenizer, token_strings: List) -> List[int]:
+    """Read current token IDs or convert legacy token-string trajectories."""
     ids = []
     for tok in token_strings:
-        if tok == MASK_TOKEN_STR:
+        if isinstance(tok, int):
+            ids.append(tok)
+        elif tok == MASK_TOKEN_STR:
             ids.append(LLADA_MASK_ID)
         else:
             tid = tokenizer.convert_tokens_to_ids(tok)
@@ -122,7 +124,11 @@ def extract_pairs(
 
     # prompt_ids and answer_ids (x_0)
     prompt_ids = token_strings_to_ids(tokenizer, prompt_strs)
-    answer_strs = final_strs[prompt_len:]
+    answer_strs = (
+        final_strs
+        if row.get("schema") == "dllm.trajectory.v1"
+        else final_strs[prompt_len:]
+    )
     answer_ids = token_strings_to_ids(tokenizer, answer_strs)
 
     if not answer_ids:
@@ -133,7 +139,7 @@ def extract_pairs(
     for step_idx, step in enumerate(steps):
         if step_idx < min_step:
             continue
-        mask_list: List[bool] = step.get("mask", [])
+        mask_list: List[bool] = step.get("masked", step.get("mask", []))
         if len(mask_list) <= prompt_len:
             continue
         # mask_bools for answer positions only

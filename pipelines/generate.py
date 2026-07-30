@@ -231,10 +231,7 @@ def main():
                 latency = __import__("time").perf_counter() - t0
 
                 # Decode readable final text (suffix only)
-                final_ids_raw = [tokenizer.convert_tokens_to_ids(t) for t in traj.final]
-                final_ids = [
-                    int(i) for i in final_ids_raw if isinstance(i, int) and i >= 0
-                ]
+                final_ids = prompt_ids + traj.final
                 suffix_text = decode_suffix_text(
                     tokenizer, final_ids, prompt_len=len(prompt_ids)
                 )

@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Dict, List
 
 import torch
-import torch.nn.functional as F
+from dllm import masked_cross_entropy
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoModel, AutoTokenizer, get_linear_schedule_with_warmup  # type: ignore
 
@@ -175,25 +175,13 @@ def masked_diffusion_loss(
     labels:  (B, L)  -100 = ignore
     weights: (B,)
     """
-    B, L, V = logits.shape
-    log_probs = F.log_softmax(logits, dim=-1)
-
-    valid = labels != -100  # (B, L)
-    safe_labels = labels.clone()
-    safe_labels[~valid] = 0
-
-    token_nll = -torch.gather(log_probs, -1, safe_labels.unsqueeze(-1)).squeeze(
-        -1
-    )  # (B, L)
-    token_nll = token_nll * valid.float()
-
-    per_sample_count = valid.sum(dim=1).float().clamp(min=1)
-    per_sample_loss = token_nll.sum(dim=1) / per_sample_count  # (B,)
-
-    w = weights.to(logits.device)
-    has_targets = (per_sample_count > 0).float()
-    total_weight = (w * has_targets).sum().clamp(min=1e-8)
-    return (per_sample_loss * w * has_targets).sum() / total_weight
+    return masked_cross_entropy(
+        logits,
+        labels,
+        labels != -100,
+        sample_weight=weights,
+        reduction="sample_mean",
+    )
 
 
 # ---------------------------------------------------------------------------

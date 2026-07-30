@@ -54,10 +54,12 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def token_strings_to_ids(tokenizer, token_strings: List[str]) -> List[int]:
+def token_strings_to_ids(tokenizer, token_strings: List) -> List[int]:
     ids = []
     for tok in token_strings:
-        if tok == MASK_TOKEN_STR:
+        if isinstance(tok, int):
+            ids.append(tok)
+        elif tok == MASK_TOKEN_STR:
             ids.append(LLADA_MASK_ID)
         else:
             tid = tokenizer.convert_tokens_to_ids(tok)
@@ -102,7 +104,11 @@ def extract_pairs(
 
     prompt_len = len(prompt_strs)
     prompt_ids = token_strings_to_ids(tokenizer, prompt_strs)
-    answer_strs = final_strs[prompt_len:]
+    answer_strs = (
+        final_strs
+        if row.get("schema") == "dllm.trajectory.v1"
+        else final_strs[prompt_len:]
+    )
     answer_ids = token_strings_to_ids(tokenizer, answer_strs)
 
     if not answer_ids:
