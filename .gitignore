@@ -15,6 +15,7 @@ data/
 
 # External dependencies and legacy code
 history/
+private/
 
 # Model weights
 *.safetensors
