@@ -203,7 +203,7 @@ python eval_results.py runs/eval_block256.jsonl
 
 ```bash
 git clone https://github.com/Tieumi221E/dllm.git
-git -C dllm checkout b176c21c68c004607f28a5bea9f929304470668b
+git -C dllm checkout e7b8543f1a68eb2e8476b54bd0121b43aee39b9c
 python -m pip install -e ./dllm
 python -m pip install -r requirements.txt
 ```
