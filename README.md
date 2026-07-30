@@ -203,14 +203,14 @@ python eval_results.py runs/eval_block256.jsonl
 
 ```bash
 git clone https://github.com/Tieumi221E/dllm.git
-git -C dllm checkout c7616f6f6ebdb433ef9afac5140263eed5e30d20
+git -C dllm checkout b176c21c68c004607f28a5bea9f929304470668b
 python -m pip install -e ./dllm
 python -m pip install -r requirements.txt
 ```
 
 Trajectory generation, trace serialization, and the constrained masked loss
 use the shared [`dllm`](https://github.com/Tieumi221E/dllm) package, verified
-against `dllm` 1.3.1 at the pinned commit above. New trajectory files store
+against `dllm` 1.3.2 at the pinned commit above. New trajectory files store
 token IDs under the `dllm.trajectory.v1` schema; the pair-preparation scripts
 continue to accept the earlier token-string format.
 
